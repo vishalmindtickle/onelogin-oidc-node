@@ -17,17 +17,15 @@ var OneLoginStrategy = require('passport-openidconnect').Strategy
 var index = require('./routes/index');
 var users = require('./routes/users');
 
-const OIDC_BASE_URI = `https://openid-connect.onelogin.com/oidc`;
+const OIDC_BASE_URI = `https://oidc.mindtickle.test`;
 
-// Configure the OpenId Connect Strategy
-// with credentials obtained from OneLogin
-passport.use(new OneLoginStrategy({
+const loginStrategy = new OneLoginStrategy({
   issuer: OIDC_BASE_URI,
   clientID: process.env.OIDC_CLIENT_ID,
   clientSecret: process.env.OIDC_CLIENT_SECRET,
-  authorizationURL: `${OIDC_BASE_URI}/auth`,
-  userInfoURL: `${OIDC_BASE_URI}/me`,
-  tokenURL: `${OIDC_BASE_URI}/token`,
+  authorizationURL: `${OIDC_BASE_URI}/oauth2/auth`,
+  userInfoURL: `${OIDC_BASE_URI}/userinfo`,
+  tokenURL: `${OIDC_BASE_URI}/oauth2/token`,
   callbackURL: process.env.OIDC_REDIRECT_URI,
   passReqToCallback: true
 },
@@ -42,7 +40,21 @@ function(req, issuer, userId, profile, accessToken, refreshToken, params, cb) {
   req.session.accessToken = accessToken;
 
   return cb(null, profile);
-}));
+})
+
+loginStrategy.authorizationParams = function(options) {
+  if (options.acr_values) {
+    return {
+      acr_values: options.acr_values,
+    }
+  }
+
+  return {};
+}
+
+// Configure the OpenId Connect Strategy
+// with credentials obtained from OneLogin
+passport.use(loginStrategy);
 
 passport.serializeUser(function(user, done) {
   done(null, user);
@@ -97,7 +109,8 @@ app.use('/users', checkAuthentication, users);
 // they will be returned to the callback handler below
 app.get('/login', passport.authenticate('openidconnect', {
   successReturnToOrRedirect: "/",
-  scope: 'email profile'
+  scope: 'offline',
+  acr_values: 'benaam.mindtickle.test',
 }));
 
 // Callback handler that OneLogin will redirect back to
